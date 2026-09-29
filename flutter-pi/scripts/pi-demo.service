@@ -1,0 +1,19 @@
+# Autostart on boot. Install on the Pi:
+#   sudo cp pi-demo.service /etc/systemd/system/
+#   sudo sed -i "s/__USER__/$USER/g" /etc/systemd/system/pi-demo.service
+#   sudo systemctl daemon-reload && sudo systemctl enable --now pi-demo.service
+[Unit]
+Description=Pi Demo (flutter-pi)
+After=systemd-user-sessions.service network-online.target
+Wants=network-online.target
+
+[Service]
+User=__USER__
+WorkingDirectory=/home/__USER__/pi_demo
+Environment=LD_LIBRARY_PATH=/home/__USER__/pi_demo
+ExecStart=/home/__USER__/pi_demo/flutter-pi --release /home/__USER__/pi_demo
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
