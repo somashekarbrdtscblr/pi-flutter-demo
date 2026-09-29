@@ -29,7 +29,8 @@ build_pi() {
   fi
 
   # Pi Zero 2 W = Cortex-A53, same tuning as the Pi 3.
-  "$tool" build --arch=arm64 --cpu=pi3 "--$MODE"
+  # No system keyboard under flutter-pi: turn on the in-app one.
+  "$tool" build --arch=arm64 --cpu=pi3 "--$MODE" --dart-define=ON_SCREEN_KEYBOARD=true
   SRC=build/flutter-pi/pi3-64
 }
 

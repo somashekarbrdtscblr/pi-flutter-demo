@@ -22,3 +22,41 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  fonts:
+    # Latin text. Bundled because the Pi has no Roboto; Material's Linux
+    # fallbacks would otherwise mix whatever fonts the system has.
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/Roboto-Regular.ttf
+        - asset: assets/fonts/Roboto-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Roboto-Bold.ttf
+          weight: 700
+    - family: NotoSansDevanagari
+      fonts:
+        - asset: assets/fonts/NotoSansDevanagari-Regular.ttf
+    - family: NotoSansBengali
+      fonts:
+        - asset: assets/fonts/NotoSansBengali-Regular.ttf
+    - family: NotoSansGurmukhi
+      fonts:
+        - asset: assets/fonts/NotoSansGurmukhi-Regular.ttf
+    - family: NotoSansGujarati
+      fonts:
+        - asset: assets/fonts/NotoSansGujarati-Regular.ttf
+    - family: NotoSansOriya
+      fonts:
+        - asset: assets/fonts/NotoSansOriya-Regular.ttf
+    - family: NotoSansTamil
+      fonts:
+        - asset: assets/fonts/NotoSansTamil-Regular.ttf
+    - family: NotoSansTelugu
+      fonts:
+        - asset: assets/fonts/NotoSansTelugu-Regular.ttf
+    - family: NotoSansKannada
+      fonts:
+        - asset: assets/fonts/NotoSansKannada-Regular.ttf
+    - family: NotoSansMalayalam
+      fonts:
+        - asset: assets/fonts/NotoSansMalayalam-Regular.ttf

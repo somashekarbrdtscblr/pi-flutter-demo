@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app/app.dart';
 import 'package:flutter_app/state/auth_state.dart';
-import 'package:flutter_app/state/settings_state.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -11,7 +10,7 @@ void main() {
   ) async {
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
-    await tester.pumpWidget(App(settings: SettingsState(prefs)));
+    await tester.pumpWidget(App(prefs: prefs));
     await tester.pumpAndSettle();
 
     // Not logged in: router redirects to the login page.

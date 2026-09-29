@@ -145,6 +145,34 @@ ssh $PI "ldd ~/$APP/flutter-pi | grep 'not found'"   # missing libs; should prin
 The app does not start by itself after a Pi reboot; run the start command
 again.
 
+## On-screen keyboard (Pi)
+
+flutter-pi draws straight to the display with no desktop, so the OS on-screen
+keyboard (squeekboard/wvkbd) cannot appear. The Pi build draws its own keyboard
+inside the app instead.
+
+- **When it opens:** when a text field is focused **by touch**. Focusing with a
+  mouse click or Tab does not open it; using the mouse or a physical key while
+  it is open hides it. A physical keyboard keeps working either way.
+- **Layouts:** QWERTY with shift (double tap = caps lock), two symbol pages,
+  and a number pad for number/phone fields (`ABC` switches to letters).
+  Follows each field's capitalization, enter action (done / next / search),
+  and input formatters.
+- **Languages** (🌐 key; last choice is remembered): English and 9 Indic
+  scripts: Devanagari (Hindi, Marathi, Nepali, Sanskrit…), Bengali (Bengali,
+  Assamese, Manipuri), Gurmukhi (Punjabi), Gujarati, Odia, Tamil, Telugu,
+  Kannada, Malayalam. The first page has vowel signs and consonants; the
+  vowel key (e.g. `अ`) opens independent vowels, native digits and
+  script-specific letters. Backspace removes one character at a time
+  (e.g. the vowel sign, not the whole syllable).
+- **Only in the Pi build:** `scripts/build.sh pi` passes
+  `--dart-define=ON_SCREEN_KEYBOARD=true`. Android, web and desktop use their
+  system keyboards; the keyboard code is not compiled into those builds.
+- **Fonts:** the Pi has neither Roboto nor Indic fonts, so both are bundled:
+  Roboto (~0.5 MB, the app font on every platform) and Noto Sans for each
+  script (~1.4 MB, font fallback). This applies to all builds, so web also
+  downloads them on first load.
+
 ## Structure
 
 ```
@@ -153,11 +181,13 @@ lib/
   app.dart         providers + MaterialApp.router
   router.dart      go_router routes, login redirect, navigation destinations
   models/          plain data classes (Product)
-  state/           ChangeNotifiers: auth (in-memory), settings (saved), products
+  state/           ChangeNotifiers: auth (in-memory), settings (saved), products,
+                   on-screen keyboard (TextInputControl)
   pages/           one file per screen
-  widgets/         app shell (drawer/sidebar) and shared widgets
+  widgets/         app shell (drawer/sidebar), on-screen keyboard, shared widgets
   theme/           ThemeData
-  utils/           validators, platform info (web-safe)
+  utils/           validators, platform info (web-safe), keyboard layouts
+assets/fonts/      Roboto (Apache 2.0) + Noto Sans for 9 Indic scripts (SIL OFL)
 test/              unit + widget tests (flutter test)
 scripts/build.sh   pi / web release builds
 ```
@@ -167,7 +197,8 @@ scripts/build.sh   pi / web release builds
 - **Navigation:** `go_router`. To add a page, add one `Destination` in
   `router.dart`. Switching pages disposes the old one, which keeps RAM low on
   the Pi. Shared data lives in `state/`, not in pages.
-- **Persistence:** only theme mode and seed colour (`shared_preferences`).
+- **Persistence:** only theme mode, seed colour and the on-screen keyboard
+  language (`shared_preferences`).
   Login and products reset on restart.
 - **Plugins:** before adding a package, check that pub.dev lists **Linux**
   support, or it won't work on the Pi.
