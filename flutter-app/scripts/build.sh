@@ -21,7 +21,7 @@ MODE="${2:-release}"
 cd "$(dirname "$0")/.."
 
 build_pi() {
-  local tool="${FLUTTERPI_TOOL:-$HOME/.pub-cache/bin/flutterpi_tool}"
+  local tool="${FLUTTERPI_TOOL:-$(command -v flutterpi_tool || echo "${PUB_CACHE:-$HOME/.pub-cache}/bin/flutterpi_tool")}"
   if [[ ! -x "$tool" ]]; then
     echo "flutterpi_tool not found at $tool" >&2
     echo "Install it with:  flutter pub global activate flutterpi_tool" >&2

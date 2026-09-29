@@ -1,0 +1,94 @@
+# CI for flutter-app/: analyze + test, then build the web and Raspberry Pi
+# (flutter-pi, Pi Zero 2 W, arm64) bundles and upload them as artifacts.
+name: flutter-app
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'flutter-app/**'
+      - '.github/workflows/flutter-app.yml'
+  pull_request:
+    paths:
+      - 'flutter-app/**'
+      - '.github/workflows/flutter-app.yml'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Build mode
+        type: choice
+        options: [release, profile, debug]
+        default: release
+
+# A newer push to the same branch cancels the older run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: 3.47.5
+  FLUTTERPI_TOOL_VERSION: 0.12.0
+  MODE: ${{ inputs.mode || 'release' }}
+
+defaults:
+  run:
+    working-directory: flutter-app
+
+jobs:
+  check:
+    name: Analyze & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - run: flutter pub get
+      - run: dart format --output=none --set-exit-if-changed lib test
+      - run: flutter analyze
+      - run: flutter test
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: check
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [web, pi]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Install flutterpi_tool
+        if: matrix.target == 'pi'
+        run: |
+          flutter pub global activate flutterpi_tool "$FLUTTERPI_TOOL_VERSION"
+          echo "${PUB_CACHE:-$HOME/.pub-cache}/bin" >> "$GITHUB_PATH"
+
+      - name: Build
+        run: scripts/build.sh ${{ matrix.target }} "$MODE"
+
+      # Artifact zips drop the executable bit, so pack the Pi bundle as a
+      # tarball to keep ./flutter-pi runnable after download.
+      - name: Package
+        run: tar -C dist -czf "flutter_app-${{ matrix.target }}-$MODE.tar.gz" ${{ matrix.target }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: flutter_app-${{ matrix.target }}-${{ env.MODE }}
+          path: flutter-app/flutter_app-${{ matrix.target }}-${{ env.MODE }}.tar.gz
+          if-no-files-found: error
+          retention-days: 14

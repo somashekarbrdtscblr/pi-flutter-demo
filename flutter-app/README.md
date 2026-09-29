@@ -35,6 +35,35 @@ Mode defaults to `release`.
 Other targets use the standard Flutter commands: `flutter build apk`,
 `flutter build linux`, `flutter build windows`.
 
+## CI (GitHub Actions)
+
+[`.github/workflows/flutter-app.yml`](../.github/workflows/flutter-app.yml)
+runs on every push to `main` and every pull request that touches
+`flutter-app/`:
+
+1. **Analyze & test:** format check, `flutter analyze`, `flutter test`.
+2. **Build web** and **Build pi** (in parallel, only if step 1 passes): runs
+   `scripts/build.sh`, uploads `flutter_app-web-release.tar.gz` and
+   `flutter_app-pi-release.tar.gz` as artifacts (kept 14 days).
+
+To build a `profile` or `debug` bundle: Actions tab → flutter-app →
+**Run workflow** → pick the mode.
+
+To deploy a CI build instead of a local one, download the artifact from the
+run page (or `gh run download -n flutter_app-pi-release`), then:
+
+```bash
+unzip flutter_app-pi-release.zip            # GitHub wraps artifacts in a zip
+tar -xzf flutter_app-pi-release.tar.gz      # -> pi/
+ssh $PI "pkill -x flutter-pi; rm -rf ~/$APP"
+scp -rp pi $PI:~/$APP
+```
+
+(`gh run download` unzips for you; skip the `unzip` step.)
+
+Flutter (`3.47.5`) and flutterpi_tool (`0.12.0`) versions are pinned at the
+top of the workflow. Bump them there when you upgrade locally.
+
 ## Run on the Raspberry Pi
 
 All commands run **on the dev machine** and reach the Pi over SSH. Set these
