@@ -30,7 +30,10 @@ permissions:
 
 env:
   FLUTTER_VERSION: 3.47.5
-  FLUTTERPI_TOOL_VERSION: 0.12.0
+  # flutterpi_tool builds against flutter_tools internals, so it must match
+  # FLUTTER_VERSION. pub.dev 0.12.0 predates Flutter 3.47; pin the upstream
+  # commit that adds 3.47 support until a release ships it.
+  FLUTTERPI_TOOL_REF: 248d79914b84ce89b44435ad8f104e81a37e1ffc
   MODE: ${{ inputs.mode || 'release' }}
 
 defaults:
@@ -75,7 +78,7 @@ jobs:
       - name: Install flutterpi_tool
         if: matrix.target == 'pi'
         run: |
-          flutter pub global activate flutterpi_tool "$FLUTTERPI_TOOL_VERSION"
+          flutter pub global activate --source git https://github.com/ardera/flutterpi_tool --git-ref "$FLUTTERPI_TOOL_REF"
           echo "${PUB_CACHE:-$HOME/.pub-cache}/bin" >> "$GITHUB_PATH"
 
       - name: Build
