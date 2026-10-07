@@ -309,8 +309,10 @@ Raspberry Pi sections; they apply unchanged:
 
 - **One-time Pi setup:** boot to console (not desktop), install `libdrm2
   libgbm1 libegl1 libgles2 libinput10 libxkbcommon0 libudev1 libsystemd0
-  libatomic1 fontconfig fonts-dejavu-core`, and add the user to the
-  `render,video,input` groups.
+  libatomic1 libvulkan1 libgstreamer1.0-0 libgstreamer-plugins-base1.0-0
+  fontconfig fonts-dejavu-core`, and add the user to the `render,video,input`
+  groups. flutter-pi links GStreamer and Vulkan even if the app uses neither,
+  so it won't start without them.
 - **Deploy:** `ssh $PI "pkill -x flutter-pi; rm -rf ~/$APP"` then
   `scp -rp dist/pi $PI:~/$APP`. Remove the old folder first, or `scp` nests
   the new copy inside it.

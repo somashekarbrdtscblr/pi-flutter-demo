@@ -25,7 +25,9 @@ scripts/build.sh web [release|profile|debug]   # -> dist/web/
 
 Mode defaults to `release`.
 
-- **pi** needs `flutterpi_tool`: `flutter pub global activate flutterpi_tool`.
+- **pi** needs `flutterpi_tool` built for your Flutter version. For Flutter
+  3.47 that is a git commit (the pub.dev release is too old):
+  `flutter pub global activate --source git https://github.com/ardera/flutterpi_tool --git-ref 248d79914b84ce89b44435ad8f104e81a37e1ffc`.
   Targets Pi OS Lite 64-bit (`--arch=arm64 --cpu=pi3`). See
   [Run on the Raspberry Pi](#run-on-the-raspberry-pi) for deploying.
 - **web** is built for the site root (`/`) with path URLs (`/products`, not
@@ -61,8 +63,9 @@ scp -rp pi $PI:~/$APP
 
 (`gh run download` unzips for you; skip the `unzip` step.)
 
-Flutter (`3.47.5`) and flutterpi_tool (`0.12.0`) versions are pinned at the
-top of the workflow. Bump them there when you upgrade locally.
+Flutter (`3.47.5`) and flutterpi_tool (git commit `248d799`) versions are
+pinned at the top of the workflow. flutterpi_tool must match Flutter: bump
+both there when you upgrade locally.
 
 ## Run on the Raspberry Pi
 
@@ -84,7 +87,8 @@ to the GPU and input devices:
 ```bash
 ssh $PI 'sudo apt-get update && sudo apt-get install -y \
   libdrm2 libgbm1 libegl1 libgles2 libinput10 libxkbcommon0 libudev1 \
-  libsystemd0 libatomic1 fontconfig fonts-dejavu-core'
+  libsystemd0 libatomic1 libvulkan1 libgstreamer1.0-0 \
+  libgstreamer-plugins-base1.0-0 fontconfig fonts-dejavu-core'
 ssh $PI 'sudo usermod -aG render,video,input $USER && sudo reboot'
 ```
 
@@ -143,7 +147,9 @@ ssh $PI "ldd ~/$APP/flutter-pi | grep 'not found'"   # missing libs; should prin
 ```
 
 The app does not start by itself after a Pi reboot; run the start command
-again.
+again. For a kiosk that starts on boot, use
+[`pi-setup/setup-flutter-pi-02W.sh`](../pi-setup/setup-flutter-pi-02W.sh)
+instead (systemd service on tty1).
 
 ## On-screen keyboard (Pi)
 

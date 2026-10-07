@@ -24,7 +24,9 @@ build_pi() {
   local tool="${FLUTTERPI_TOOL:-$(command -v flutterpi_tool || echo "${PUB_CACHE:-$HOME/.pub-cache}/bin/flutterpi_tool")}"
   if [[ ! -x "$tool" ]]; then
     echo "flutterpi_tool not found at $tool" >&2
-    echo "Install it with:  flutter pub global activate flutterpi_tool" >&2
+    echo "Install the version that matches your Flutter (see FLUTTERPI_TOOL_REF in" >&2
+    echo ".github/workflows/flutter-app.yml), e.g.:" >&2
+    echo "  flutter pub global activate --source git https://github.com/ardera/flutterpi_tool --git-ref <ref>" >&2
     exit 1
   fi
 
