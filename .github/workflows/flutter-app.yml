@@ -81,6 +81,21 @@ jobs:
           flutter pub global activate --source git https://github.com/ardera/flutterpi_tool --git-ref "$FLUTTERPI_TOOL_REF"
           echo "${PUB_CACHE:-$HOME/.pub-cache}/bin" >> "$GITHUB_PATH"
 
+      # Build-time config: repo variable ENV_PI / ENV_WEB holds the whole
+      # .env file (Settings > Secrets and variables > Actions > Variables).
+      # Unset falls back to the committed .example template.
+      - name: Write .env.${{ matrix.target }}
+        env:
+          TARGET: ${{ matrix.target }}
+          DOTENV: ${{ matrix.target == 'pi' && vars.ENV_PI || vars.ENV_WEB }}
+        run: |
+          if [[ -n "$DOTENV" ]]; then
+            printf '%s\n' "$DOTENV" > ".env.$TARGET"
+          else
+            echo "::warning::vars.ENV_${TARGET^^} not set, building with .env.$TARGET.example"
+            cp ".env.$TARGET.example" ".env.$TARGET"
+          fi
+
       - name: Build
         run: scripts/build.sh ${{ matrix.target }} "$MODE"
 

@@ -49,3 +49,7 @@ app.*.map.json
 
 # Build script output
 /dist/
+
+# Build-time config (scripts/build.sh). Commit only the .example templates.
+.env*
+!.env*.example

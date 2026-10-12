@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../config/env.dart';
 import '../state/settings_state.dart';
 import '../utils/platform_info.dart';
 import '../widgets/section.dart';
@@ -87,6 +88,7 @@ class SettingsPage extends StatelessWidget {
                 kReleaseMode ? 'release' : (kProfileMode ? 'profile' : 'debug'),
               ),
               _info('CPU cores', cpuCores),
+              _info('API', Env.baseApi.isEmpty ? '(not set)' : Env.baseApi),
             ],
           ),
         ),

@@ -4,11 +4,12 @@
 #   scripts/build.sh pi  [release|profile|debug]   Raspberry Pi Zero 2 W (Pi OS 64-bit, flutter-pi)
 #   scripts/build.sh web [release|profile|debug]   Static site, served at /
 #
-# Mode defaults to release.
+# Mode defaults to release. Config is compiled in from .env.<target>
+# (.env.pi / .env.web; copy the .example file). ENV_FILE=path overrides it.
 set -euo pipefail
 
 usage() {
-  sed -n '2,7p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'
   exit 1
 }
 
@@ -19,6 +20,14 @@ MODE="${2:-release}"
 [[ "$MODE" == release || "$MODE" == profile || "$MODE" == debug ]] || usage
 
 cd "$(dirname "$0")/.."
+
+ENV_FILE="${ENV_FILE:-.env.$TARGET}"
+if [[ ! -f "$ENV_FILE" ]]; then
+  echo "$ENV_FILE not found. Create it from the template:" >&2
+  echo "  cp .env.$TARGET.example .env.$TARGET" >&2
+  exit 1
+fi
+DEFINES=("--dart-define-from-file=$ENV_FILE")
 
 build_pi() {
   local tool="${FLUTTERPI_TOOL:-$(command -v flutterpi_tool || echo "${PUB_CACHE:-$HOME/.pub-cache}/bin/flutterpi_tool")}"
@@ -32,13 +41,13 @@ build_pi() {
 
   # Pi Zero 2 W = Cortex-A53, same tuning as the Pi 3.
   # No system keyboard under flutter-pi: turn on the in-app one.
-  "$tool" build --arch=arm64 --cpu=pi3 "--$MODE" --dart-define=ON_SCREEN_KEYBOARD=true
+  "$tool" build --arch=arm64 --cpu=pi3 "--$MODE" "${DEFINES[@]}" --dart-define=ON_SCREEN_KEYBOARD=true
   SRC=build/flutter-pi/pi3-64
 }
 
 build_web() {
   # Path URLs (/products): the web server must serve index.html for unknown paths.
-  flutter build web "--$MODE" --base-href /
+  flutter build web "--$MODE" --base-href / "${DEFINES[@]}"
   SRC=build/web
 }
 
@@ -53,4 +62,4 @@ cp -a "$SRC/." "$OUT/"
 [[ "$TARGET" == pi ]] && rm -rf "$OUT/linux"
 
 echo
-echo "Built $TARGET ($MODE): $OUT ($(du -sh "$OUT" | cut -f1))"
+echo "Built $TARGET ($MODE, $ENV_FILE): $OUT ($(du -sh "$OUT" | cut -f1))"

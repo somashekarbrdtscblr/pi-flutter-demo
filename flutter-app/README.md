@@ -25,6 +25,23 @@ scripts/build.sh web [release|profile|debug]   # -> dist/web/
 
 Mode defaults to `release`.
 
+### Config (.env per target)
+
+Like React's `.env`, config is compiled into the build, one file per target:
+
+```bash
+cp .env.pi.example  .env.pi    # used by scripts/build.sh pi
+cp .env.web.example .env.web   # used by scripts/build.sh web
+ENV_FILE=.env.pi.staging scripts/build.sh pi   # any other file
+flutter run -d chrome --dart-define-from-file=.env.web   # dev
+```
+
+`.env.pi` / `.env.web` are gitignored; only the `.example` templates are
+committed. Read values through `lib/config/env.dart` (`Env.baseApi`); add new
+keys there and to both templates. Settings → Info shows the API URL the build
+got. Values end up in the bundle in plain text, so never put secrets there.
+In CI, set repo variables `ENV_PI` / `ENV_WEB` to the full file contents.
+
 - **pi** needs `flutterpi_tool` built for your Flutter version. For Flutter
   3.47 that is a git commit (the pub.dev release is too old):
   `flutter pub global activate --source git https://github.com/ardera/flutterpi_tool --git-ref 248d79914b84ce89b44435ad8f104e81a37e1ffc`.
