@@ -25,6 +25,7 @@ new app.
 | `go_router` + `provider` app structure, login redirect, saved settings | Same layout in every app, so adding a page is one line |
 | Path URLs on web (`/home`, not `/#/home`) | Clean web URLs |
 | `scripts/build.sh pi\|web` | One command per target, output in `dist/<target>/` |
+| Build-time config per target (`.env.pi`, `.env.web`) | Like React's `.env`: API URL and other settings compiled into each build |
 | GitHub Actions workflow | Format check, analyze and test on every push, plus web and Pi builds |
 
 The `android/`, `linux/`, `web/` and `windows/` folders stay exactly as
@@ -120,23 +121,41 @@ flutter pub get
 **Linux** support. flutter-pi uses the Linux embedding, so a plugin that only
 supports Android, iOS or web will fail on the Pi.
 
-## Step 4: Analyzer and git ignore
+## Step 4: Analyzer, git ignore and config files
 
 ```bash
 cp "$SRC/analysis_options.yaml" .
-printf '\n# Build script output\n/dist/\n' >> .gitignore
+cp "$SRC"/.env.{pi,web}.example .
+cat >> .gitignore <<'EOF'
+
+# Build script output
+/dist/
+
+# Build-time config (scripts/build.sh). Commit only the .example templates.
+.env*
+!.env*.example
+EOF
+cp .env.pi.example .env.pi
+cp .env.web.example .env.web
 ```
 
 `analysis_options.yaml` stops `flutter analyze` from scanning the generated
 platform folders and `build/`.
+
+`.env.pi` and `.env.web` hold the build-time config for each target, one
+`KEY=value` per line. Edit them now (at least `CHOTAPOS_BASE_API`). They are
+gitignored, so each developer and CI writes their own; only the `.example`
+templates are committed. Values are compiled into the bundle as plain text:
+**never put secrets in them.**
 
 ## Step 5: App code
 
 Copy the app skeleton from the reference app:
 
 ```bash
-mkdir -p lib/pages lib/state lib/theme lib/utils lib/widgets
+mkdir -p lib/config lib/pages lib/state lib/theme lib/utils lib/widgets
 cp "$SRC"/lib/{main,app,router}.dart lib/
+cp "$SRC"/lib/config/env.dart lib/config/
 cp "$SRC"/lib/pages/{login,settings}_page.dart lib/pages/
 cp "$SRC"/lib/state/{auth_state,settings_state,on_screen_keyboard}.dart lib/state/
 cp "$SRC"/lib/theme/app_theme.dart lib/theme/
@@ -212,6 +231,7 @@ lib/
   main.dart        loads saved settings, turns on path URLs for web, starts the app
   app.dart         providers + MaterialApp.router (+ on-screen keyboard on Pi)
   router.dart      routes, login redirect, the side-navigation list
+  config/env.dart  build-time config from .env.<target> (Env.baseApi)
   state/           ChangeNotifiers: auth, settings (saved), on-screen keyboard
   pages/           one file per screen
   widgets/         app shell (drawer/sidebar), Section/PageBody, on-screen keyboard
@@ -229,6 +249,10 @@ lib/
 - **On-screen keyboard** is compiled in only when the build passes
   `--dart-define=ON_SCREEN_KEYBOARD=true`, which `scripts/build.sh pi` does.
   Other builds use the system keyboard.
+- **Config** comes from `Env` in `config/env.dart`
+  (`String.fromEnvironment`, so it must stay `const`). To add a setting, add
+  the key to `Env` and to both `.env.*.example` templates. Settings → Info
+  shows the API URL a build was made with.
 
 ## Step 6: Tests
 
@@ -263,9 +287,13 @@ chmod +x scripts/build.sh
 The script needs no edits. It works from any directory:
 
 ```bash
-scripts/build.sh pi  [release|profile|debug]   # -> dist/pi/
-scripts/build.sh web [release|profile|debug]   # -> dist/web/
+scripts/build.sh pi  [release|profile|debug]   # -> dist/pi/,  config from .env.pi
+scripts/build.sh web [release|profile|debug]   # -> dist/web/, config from .env.web
+ENV_FILE=.env.pi.staging scripts/build.sh pi   # any other config file
 ```
+
+Each target reads its own file through `--dart-define-from-file`. The build
+stops if the file is missing (copy the `.example`, see Step 4).
 
 - **pi:** `flutterpi_tool build --arch=arm64 --cpu=pi3` (Pi Zero 2 W has
   the same Cortex-A53 as the Pi 3), with the on-screen keyboard turned on.
@@ -276,7 +304,8 @@ scripts/build.sh web [release|profile|debug]   # -> dist/web/
   `try_files $uri $uri/ /index.html;`).
 
 Android, Linux and Windows use the normal Flutter commands
-(`flutter build apk`, `flutter build linux`, `flutter build windows`).
+(`flutter build apk`, `flutter build linux`, `flutter build windows`). Pass
+the config yourself: `flutter build apk --dart-define-from-file=.env.pi`.
 
 ## Step 8: Check it works
 
@@ -284,9 +313,12 @@ Android, Linux and Windows use the normal Flutter commands
 dart format lib test
 flutter analyze            # expect: No issues found!
 flutter test               # expect: All tests passed!
-flutter run -d linux       # log in, open Settings, change the theme, restart: theme is kept
+flutter run -d linux --dart-define-from-file=.env.pi
+                           # log in, open Settings, change the theme, restart: theme is kept;
+                           # Settings > Info > API shows the URL from .env.pi
 scripts/build.sh web
 scripts/build.sh pi
+git status                 # .env.pi and .env.web are not listed (ignored)
 ```
 
 ## Step 9: CI (standalone repository)
@@ -301,11 +333,18 @@ to the new repository's `.github/workflows/` and change:
 Keep `FLUTTER_VERSION` and `FLUTTERPI_TOOL_REF` matched with what you use
 locally. (In the monorepo, use Part 2, step 5 instead.)
 
+The `Write .env.<target>` step creates the config file before the build.
+Under **Settings → Secrets and variables → Actions → Variables**, add
+`ENV_PI` and `ENV_WEB`, each holding the whole file (multi-line
+`KEY=value`). If one is not set, CI builds with the `.example` template and
+shows a warning.
+
 ## Step 10: README
 
 Copy `$SRC/README.md` and update it: names, the `APP=` folder variable, and
 the "Structure" section. Drop the parts about the demo pages. Keep the
-Raspberry Pi sections; they apply unchanged:
+Raspberry Pi sections and the "Config (.env per target)" section; they
+apply unchanged:
 
 - **One-time Pi setup:** boot to console (not desktop), install `libdrm2
   libgbm1 libegl1 libgles2 libinput10 libxkbcommon0 libudev1 libsystemd0
@@ -355,7 +394,7 @@ In the root `package.json` `scripts`, next to the
 `*:chotapos-billing-cpp-*` entries:
 
 ```json
-"dev:chotapos-flutter": "cd apps/chotapos-flutter && flutter run -d linux",
+"dev:chotapos-flutter": "cd apps/chotapos-flutter && flutter run -d linux --dart-define-from-file=.env.pi",
 "test:chotapos-flutter": "cd apps/chotapos-flutter && flutter analyze && flutter test",
 "build:chotapos-flutter-pi": "bash apps/chotapos-flutter/scripts/build.sh pi",
 "build:chotapos-flutter-web": "bash apps/chotapos-flutter/scripts/build.sh web",
@@ -369,7 +408,7 @@ Pass a mode after `--`, for example `npm run build:chotapos-flutter-pi -- profil
 |---|---|---|
 | `.prettierignore` | Add a line `.dart_tool` | The root `format` script passes `--ignore-path .prettierignore`, which turns off `.gitignore`. Without this line, Prettier rewrites the JSON files in `.dart_tool/` |
 | `.gitattributes` | None | `*.sh text eol=lf` already covers `scripts/build.sh` (CRLF line endings would break it on Linux) |
-| `.gitignore` | None | Root already ignores `dist`. The app's own `.gitignore` covers `build/`, `.dart_tool/` and the rest |
+| `.gitignore` | None | Root already ignores `dist`. The app's own `.gitignore` covers `build/`, `.dart_tool/`, `.env.pi`, `.env.web` and the rest |
 | `.husky/pre-commit`, ESLint | None | They only run inside the JS workspaces |
 
 Optional: to check Dart formatting before each commit, add this line to
@@ -408,6 +447,17 @@ In the `build` job, change the `flutter_app-` prefix to `chotapos_flutter-`
 in the `Package` step, the artifact `name`, and the artifact `path` (which
 becomes `apps/chotapos-flutter/chotapos_flutter-...tar.gz`).
 
+Repository variables are shared by every app in the monorepo, so give the
+config variables app-specific names. In the `Write .env.<target>` step:
+
+```yaml
+DOTENV: ${{ matrix.target == 'pi' && vars.CHOTAPOS_FLUTTER_ENV_PI || vars.CHOTAPOS_FLUTTER_ENV_WEB }}
+```
+
+and change `vars.ENV_${TARGET^^}` in its warning to
+`vars.CHOTAPOS_FLUTTER_ENV_${TARGET^^}`. Then add both variables in the
+`chota-pos` repository settings.
+
 The `paths:` filter keeps this workflow from running on backend or frontend
 changes, and keeps the existing workflows from running on Flutter changes.
 This workflow only builds and uploads artifacts. Wiring it into the S3
@@ -421,7 +471,7 @@ npm run build:chotapos-flutter-web
 npm run build:chotapos-flutter-pi
 npm query .workspace | grep chotapos-flutter       # prints nothing: not an npm workspace
 npm run format:check                               # no .dart_tool files listed
-git status                                         # no build/, dist/ or .dart_tool/ files
+git status                                         # no build/, dist/, .dart_tool/ or .env.pi/.env.web files
 ```
 
 Then commit, push the branch and open a pull request into `test`. Check that
@@ -438,5 +488,8 @@ the `chotapos-flutter` workflow runs and goes green.
 | A plugin works on Android or web but crashes on the Pi | The plugin has no Linux support. Pick one that lists Linux on pub.dev |
 | Text on the Pi shows boxes or the wrong font | A font is missing from `assets/fonts/` or the `fonts:` list in `pubspec.yaml` |
 | No keyboard appears on the Pi | The build did not pass `--dart-define=ON_SCREEN_KEYBOARD=true`. Build with `scripts/build.sh pi`. The keyboard opens only when a field is focused by touch |
+| `.env.pi not found` (or `.env.web`) from `scripts/build.sh` | Copy the template: `cp .env.pi.example .env.pi`, then edit it |
+| Settings → Info → API shows `(not set)` | The build or `flutter run` did not get the config file. Use `scripts/build.sh`, or add `--dart-define-from-file=.env.<target>` to `flutter run` |
+| Changed `.env.*` but the app still has the old value | Config is compiled in. Rebuild and redeploy. With `flutter run`, hot reload and hot restart keep the old values: stop and run again |
 | Web page 404s after a refresh | The web server does not fall back to `index.html` for unknown paths |
 | After `scp`, the app is in `~/$APP/pi/` | The old folder still existed. Delete it before copying |
