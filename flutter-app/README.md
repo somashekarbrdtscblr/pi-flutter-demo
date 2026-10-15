@@ -164,9 +164,34 @@ ssh $PI "ldd ~/$APP/flutter-pi | grep 'not found'"   # missing libs; should prin
 ```
 
 The app does not start by itself after a Pi reboot; run the start command
-again. For a kiosk that starts on boot, use
+again. For a kiosk that starts on boot, use the systemd service below instead.
+
+### Kiosk mode (systemd service)
+
 [`pi-setup/setup-flutter-pi-02W.sh`](../pi-setup/setup-flutter-pi-02W.sh)
-instead (systemd service on tty1).
+runs the bundle from `/home/chotapos/app/flutter` as `chotapos-flutter.service`
+on tty1, started on boot. Run it once; the script header lists what to do
+first.
+
+To replace the bundle with a newer build, you don't need to run setup again:
+
+```bash
+scripts/build.sh pi
+ssh $PI "sudo systemctl stop chotapos-flutter && rm -rf /home/chotapos/app/flutter"
+scp -rp dist/pi $PI:/home/chotapos/app/flutter
+ssh $PI "sudo systemctl start chotapos-flutter"
+```
+
+Rerun setup only when the runtime libraries, unit files or `CHOTAPOS_*`
+settings change.
+
+- Use `systemctl`, not `pkill`: the service restarts flutter-pi 3 s after it
+  exits.
+- Ctrl+Alt+F2..F6 stops the app and shows a login console; Ctrl+Alt+F1 starts
+  it again (state is not kept). Don't switch VTs mid-redeploy, or the app starts
+  from a half-copied bundle.
+- Status and logs: `ssh $PI 'systemctl status chotapos-flutter'` and
+  `ssh $PI 'tail -f /home/chotapos/app/chotapos-flutter.log'`.
 
 ## On-screen keyboard (Pi)
 

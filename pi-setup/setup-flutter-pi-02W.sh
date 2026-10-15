@@ -185,7 +185,7 @@ cat >"${WATCH_BIN}" <<EOF
 last=tty1
 while true; do
   # No VT support: behave as if tty1 stays active.
-  read -r active </sys/class/tty/tty0/active 2>/dev/null || active=tty1
+  read -r active 2>/dev/null </sys/class/tty/tty0/active || active=tty1
   if [[ "\${active}" != "\${last}" ]]; then
     if [[ "\${active}" == "tty1" ]]; then
       systemctl start "${SERVICE_NAME}"
