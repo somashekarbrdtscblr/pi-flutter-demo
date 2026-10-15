@@ -16,8 +16,16 @@ set -euo pipefail
 #   ssh $PI "sudo systemctl stop chotapos-flutter && rm -rf /home/chotapos/app/flutter"
 #   scp -rp dist/pi $PI:/home/chotapos/app/flutter
 #   ssh $PI "sudo systemctl start chotapos-flutter"
+# (Switching VTs mid-redeploy starts the app again on Ctrl+Alt+F1, so don't.)
 #
 # Per-device settings go in ${ENV_FILE} (created once, never overwritten).
+#
+# Virtual terminals: Ctrl+Alt+F2..F6 opens a login console, Ctrl+Alt+F1 returns
+# to the app. flutter-pi never lets go of the display (DRM master) and has no
+# VT-switch handling, so on its own the kernel switches VT but the screen stays
+# on the app. A small watcher service stops the app while tty1 is not the active
+# VT and starts it again when tty1 comes back. The app restarts from scratch
+# each time (state is not kept) and the other VTs show a login prompt.
 
 APP_USER="${CHOTAPOS_USER:-chotapos}"
 APP_DIR="${CHOTAPOS_APP_DIR:-/home/${APP_USER}/app}"
@@ -32,6 +40,8 @@ ENV_FILE="${CHOTAPOS_FLUTTER_ENV_FILE:-${APP_DIR}/flutter.env}"
 BASE_API="${CHOTAPOS_BASE_API:-http://localhost:3000/api}"
 SERVICE_NAME="${CHOTAPOS_FLUTTER_SERVICE_NAME:-chotapos-flutter.service}"
 OLD_SERVICE_NAME="chotapos-labwc.service"
+WATCH_SERVICE_NAME="${CHOTAPOS_VT_WATCH_SERVICE_NAME:-chotapos-vt-watch.service}"
+WATCH_BIN="/usr/local/sbin/chotapos-vt-watch"
 
 case "${FLUTTER_MODE}" in
   release | profile | debug) ;;
@@ -53,6 +63,7 @@ fi
 
 APP_GROUP="$(id -gn "${APP_USER}")"
 SERVICE_PATH="/etc/systemd/system/${SERVICE_NAME}"
+WATCH_SERVICE_PATH="/etc/systemd/system/${WATCH_SERVICE_NAME}"
 
 # Both services want tty1 and the display. If the old one stays enabled,
 # whichever starts last at boot wins.
@@ -164,8 +175,47 @@ RestartSec=3
 WantedBy=multi-user.target
 EOF
 
+echo "=== Writing VT-switch watcher ==="
+cat >"${WATCH_BIN}" <<EOF
+#!/bin/bash
+# Stop ${SERVICE_NAME} when the active virtual terminal leaves tty1 and start it
+# when tty1 comes back, so Ctrl+Alt+F2.. can show a console (flutter-pi holds
+# the display until it exits). Acts only on a VT change, so a manual
+# "systemctl stop" (e.g. while redeploying the bundle) is left alone.
+last=tty1
+while true; do
+  # No VT support: behave as if tty1 stays active.
+  read -r active </sys/class/tty/tty0/active 2>/dev/null || active=tty1
+  if [[ "\${active}" != "\${last}" ]]; then
+    if [[ "\${active}" == "tty1" ]]; then
+      systemctl start "${SERVICE_NAME}"
+    else
+      systemctl stop "${SERVICE_NAME}"
+    fi
+    last="\${active}"
+  fi
+  sleep 0.5
+done
+EOF
+chmod 0755 "${WATCH_BIN}"
+
+cat >"${WATCH_SERVICE_PATH}" <<EOF
+[Unit]
+Description=ChotaPOS VT-switch watcher (stops the app off tty1)
+After=${SERVICE_NAME}
+
+[Service]
+Type=simple
+ExecStart=${WATCH_BIN}
+Restart=always
+RestartSec=1
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
 systemctl daemon-reload
-systemctl enable "${SERVICE_NAME}"
+systemctl enable "${SERVICE_NAME}" "${WATCH_SERVICE_NAME}"
 
 echo
 echo "Setup complete. Pi will reboot in 10 seconds..."
@@ -173,9 +223,12 @@ echo "Bundle:  ${FLUTTER_DIR}"
 echo "Config:  ${ENV_FILE}"
 echo "Log:     ${APP_LOG}"
 echo "Service: ${SERVICE_PATH}"
+echo "Watcher: ${WATCH_SERVICE_PATH} (Ctrl+Alt+F2..F6 console, Ctrl+Alt+F1 back to app)"
 echo "Status after boot: systemctl status ${SERVICE_NAME}"
 systemd-run --on-active=10 /usr/sbin/reboot
 systemd-run --on-active=5 /usr/bin/systemctl disable getty@tty1.service
 
 # This will kill the current TTY1 session.
+# restart, not start: a rerun must pick up the rewritten watcher.
+systemctl restart "${WATCH_SERVICE_NAME}" || true
 systemctl start "${SERVICE_NAME}" || true

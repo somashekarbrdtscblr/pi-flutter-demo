@@ -21,6 +21,9 @@ APP_LOG="${APP_DIR}/chotapos-flutter.log"
 ENV_FILE="${CHOTAPOS_FLUTTER_ENV_FILE:-${APP_DIR}/flutter.env}"
 SERVICE_NAME="${CHOTAPOS_FLUTTER_SERVICE_NAME:-chotapos-flutter.service}"
 SERVICE_PATH="/etc/systemd/system/${SERVICE_NAME}"
+WATCH_SERVICE_NAME="${CHOTAPOS_VT_WATCH_SERVICE_NAME:-chotapos-vt-watch.service}"
+WATCH_SERVICE_PATH="/etc/systemd/system/${WATCH_SERVICE_NAME}"
+WATCH_BIN="/usr/local/sbin/chotapos-vt-watch"
 
 PURGE=0
 case "${1:-}" in
@@ -35,6 +38,13 @@ esac
 if [[ "${EUID}" -ne 0 ]]; then
   exec sudo -E bash "$0" "$@"
 fi
+
+# Watcher first, or it would start the app again.
+echo "=== Removing VT-switch watcher ==="
+systemctl stop "${WATCH_SERVICE_NAME}" 2>/dev/null || true
+systemctl disable "${WATCH_SERVICE_NAME}" 2>/dev/null || true
+rm -f "${WATCH_SERVICE_PATH}" "${WATCH_BIN}"
+systemctl reset-failed "${WATCH_SERVICE_NAME}" 2>/dev/null || true
 
 echo "=== Stopping ${SERVICE_NAME} ==="
 systemctl stop "${SERVICE_NAME}" 2>/dev/null || true
